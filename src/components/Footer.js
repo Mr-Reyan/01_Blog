@@ -21,7 +21,7 @@ export default function Footer() {
           </Link>
         </nav>
 
-        <p className="text-sm text-zinc-500">© 2026 MyBlog. Built as a weekend project.</p>
+        <p className="text-sm text-zinc-500">© 2026 MyBlog.</p>
       </div>
     </footer>
   );
