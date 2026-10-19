@@ -55,7 +55,7 @@ class CategorySerializer(serializers.ModelSerializer):
         return value
 
 class PostSerializer(serializers.ModelSerializer):
-    author = UserSerializer(read_only=True)  # Nest the user data
+    author = UserSerializer(read_only=True) 
 
     class Meta:
         model = Post

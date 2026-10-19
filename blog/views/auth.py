@@ -8,14 +8,18 @@ from rest_framework.throttling import ScopedRateThrottle
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
+from drf_spectacular.utils import extend_schema, inline_serializer
+from rest_framework import serializers
 
+
+@extend_schema(request=RegisterSerializer, responses={201: RegisterSerializer})
 class RegisterView(APIView):
     """
     POST /api/v1/auth/register/
     Public. Creates an AUTHOR account. ADMIN role is never assignable here.
     """
     permission_classes = [AllowAny]
-    authentication_classes = []  # no point authenticating a public endpoint
+    authentication_classes = []  
 
     def post(self, request):
         serializer = RegisterSerializer(data=request.data)
@@ -24,6 +28,7 @@ class RegisterView(APIView):
         user = serializer.save()
         return Response(UserSerializer(user).data, status=status.HTTP_201_CREATED)
 
+@extend_schema(responses=UserSerializer)
 class MeView(APIView):
     permission_classes = [IsAuthenticated]
     def get(self, request):
@@ -35,6 +40,11 @@ class LoginView(TokenObtainPairView):
     permission_classes = [AllowAny]
     authentication_classes = []
 
+
+@extend_schema(
+    request=inline_serializer("LogoutRequest", {"refresh": serializers.CharField()}),
+    responses={205: None},
+)
 class LogoutView(APIView):
     permission_classes = [IsAuthenticated]
     def post(self, request):

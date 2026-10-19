@@ -1,4 +1,3 @@
-# blog/views/post.py
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.decorators import action
@@ -11,6 +10,7 @@ from ..models import Post
 from ..permissions import IsOwnerOrAdmin
 from ..serializers import PostSerializer
 from ..services import visible_posts_for
+from drf_spectacular.utils import extend_schema
 
 class PostViewSet(ModelViewSet):
     serializer_class = PostSerializer
@@ -31,6 +31,8 @@ class PostViewSet(ModelViewSet):
         return [IsAuthenticated()]
 
     def get_queryset(self):
+        if getattr(self, "swagger_fake_view", False):
+            return Post.objects.none()
         qs = visible_posts_for(self.request.user)
         qs = qs.select_related("author").prefetch_related("categories")
         if self.action == "list" and self.request.query_params.get("mine") == "true":
@@ -44,6 +46,7 @@ class PostViewSet(ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(author=self.request.user, status=Post.Status.DRAFT)
 
+    @extend_schema(request=None, responses=PostSerializer)
     @action(
         detail=True,
         methods=["post"],

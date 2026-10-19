@@ -5,7 +5,6 @@ from rest_framework_simplejwt.views import TokenRefreshView
 
 from .views import auth, post, comment, category
 
-# ---------- Auth (function/class views, not a router) ----------
 auth_patterns = [
     path("register/", auth.RegisterView.as_view(), name="auth-register"),
     path("login/", auth.LoginView.as_view(), name="auth-login"),
@@ -14,12 +13,11 @@ auth_patterns = [
     path("logout/",auth.LogoutView.as_view(), name="auth-logout"),
 ]
 
-# ---------- Content (routers) ----------
+
 router = DefaultRouter()
 router.register("posts", post.PostViewSet, basename="post")
 router.register("categories", category.CategoryViewSet, basename="category")
 
-# ---------- Nested comments (explicit paths, not router) ----------
 comment_patterns = [
     path(
         "posts/<slug:post_slug>/comments/",

@@ -145,6 +145,7 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",  # secure by default
     ],
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema"
 }
 
 SIMPLE_JWT = {
@@ -167,6 +168,6 @@ REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"] = {
     "user": "1000/hour",
 "login": "10/minute",
 }
-REST_FRAMEWORK["DEFAULT_SCHEMA_CLASS"] = "drf_spectacular.openapi.AutoSchema"
+
 
 SPECTACULAR_SETTINGS = {"TITLE": "Blog Platform API", "VERSION": "1.0.0"}

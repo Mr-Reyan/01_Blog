@@ -1,7 +1,5 @@
 # Blog Platform (Weekend 1 - 01_Blog)
 
-> DRAFT. Search this file for `<<FILL` and replace every marker with the real value before submitting.
-
 ## Purpose
 
 A multi-user blog platform exposed as a REST API. Authors register, write posts as drafts, publish them, and organise them in categories. Readers can browse, search and filter published posts and comment when logged in. Admins moderate content and manage categories.
@@ -13,9 +11,9 @@ A multi-user blog platform exposed as a REST API. Authors register, write posts 
 | Language | Python 3.13 |
 | Framework | Django 5.2.8 + Django REST Framework |
 | Auth | JWT bearer tokens via `djangorestframework-simplejwt` |
-| Database | <<FILL: SQLite / PostgreSQL - which one do you run locally?>> |
+| Database | SQLite |
 | Tests | pytest 9.1.1 + pytest-django 4.12.0 |
-| Frontend | <<FILL: name, or "none - API only">> |
+| Frontend | Next.js |
 
 ## Scope (implemented)
 
@@ -52,7 +50,7 @@ Full endpoint reference: [`openapi.yaml`](openapi.yaml).
 
 ## Architecture summary
 
-Client -> Django REST API (`/api/v1/`) -> <<FILL: database>>. Code layout inside `blog/`:
+Client -> Django REST API (`/api/v1/`) -> db.sqlite. Code layout inside `blog/`:
 
 - `models.py` - `User` (custom, with role), `Category`, `Post`, `Comment`
 - `views/` - `auth.py`, `post.py`, `category.py`, `comment.py`
@@ -69,7 +67,7 @@ Diagram: `architecture.pdf`. Reasoning and trade-offs: `engineering-decisions.md
 cd backend
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt        # <<FILL: confirm the file name>>
+pip install -r requirements.txt        
 python manage.py migrate
 python manage.py createsuperuser       # creates an admin
 python manage.py runserver             # API at http://localhost:8000/api/v1/
@@ -87,9 +85,8 @@ Last full run: 113 passed in 76.39 s (Python 3.13.7, Django 5.2.8). Test cases a
 
 | Variable | Purpose |
 |---|---|
-| <<FILL>> | <<FILL: e.g. Django secret key>> |
-| <<FILL>> | <<FILL: e.g. debug flag>> |
-| <<FILL>> | <<FILL: e.g. database URL / allowed hosts>> |
+| SECRET_KEY | django-secret-key |
+| DEBUG | true |
 
 ## Quick API walkthrough
 
@@ -103,4 +100,4 @@ curl -X POST http://localhost:8000/api/v1/posts/hello/publish/ -H "Authorization
 
 ## Known gaps
 
-Listed with impact and planned fix in `engineering-decisions.md` (section 5). Headline items: no logout route, post counters not maintained, no pagination, no Docker/CI in the repo <<FILL: delete the last item if you have them>>.
+Listed with impact and planned fix in `engineering-decisions.md` (section 5). Headline items: post counters not maintained, no pagination, no Docker/CI in the repo .

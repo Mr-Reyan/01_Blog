@@ -13,7 +13,10 @@ class CategoryViewSet(viewsets.ModelViewSet):
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
     lookup_field = "slug"
-
+    def get_queryset(self):
+        if getattr(self, "swagger_fake_view", False):
+            return Category.objects.none()
+        return super().get_queryset()
     def get_permissions(self):
         if self.action in ("list","retrieve"):
             return [AllowAny()]

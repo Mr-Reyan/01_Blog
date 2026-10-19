@@ -1,4 +1,3 @@
-# blog/models.py
 import uuid
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser
@@ -8,10 +7,6 @@ from django.urls import reverse
 from django.utils import timezone
 from django.utils.text import slugify
 
-
-# ---------------------------------------------------------------------------
-# Users & roles
-# ---------------------------------------------------------------------------
 class User(AbstractUser):
     """
     Custom user because the assignment requires author/admin roles.
@@ -31,7 +26,6 @@ class User(AbstractUser):
         help_text="Admins can moderate all content; authors manage their own posts.",
     )
     bio = models.TextField(blank=True, max_length=500)
-    # avatar handled later by a FileField / S3 (planned — see engineering decisions)
     REQUIRED_FIELDS = []
     class Meta:
         indexes = [models.Index(fields=["role"])]
@@ -43,9 +37,6 @@ class User(AbstractUser):
         return f"{self.username} ({self.role})"
 
 
-# ---------------------------------------------------------------------------
-# Taxonomy
-# ---------------------------------------------------------------------------
 class Category(models.Model):
     """
     Flat categories (no nesting) — matches MVP scope. Nesting can be added
@@ -71,9 +62,7 @@ class Category(models.Model):
         return self.name
 
 
-# ---------------------------------------------------------------------------
-# Posts
-# ---------------------------------------------------------------------------
+
 class Post(models.Model):
     """
     Core content entity. Draft -> Published lifecycle via `status`.
@@ -88,11 +77,11 @@ class Post(models.Model):
     title = models.CharField(max_length=200, validators=[MinLengthValidator(3)])
     slug = models.SlugField(max_length=240, unique=True, db_index=True)
     body = models.TextField(validators=[MinLengthValidator(10)],max_length=1000)
-    # excerpt = models.CharField(max_length=300, blank=True)
+
 
     author = models.ForeignKey(
         settings.AUTH_USER_MODEL,
-        on_delete=models.PROTECT,          # never lose posts if a user is deleted
+        on_delete=models.PROTECT,          
         related_name="posts",
     )
     categories = models.ManyToManyField(
@@ -109,7 +98,6 @@ class Post(models.Model):
     )
     published_at = models.DateTimeField(null=True, blank=True, db_index=True)
 
-    # lightweight denormalized counters — updated in service layer, not triggers
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -127,7 +115,6 @@ class Post(models.Model):
             base = slugify(self.title)[:200] or "post"
             slug = base
             n = 1
-            # ensure uniqueness without a DB race in dev; production would retry on IntegrityError
             while Post.objects.filter(slug=slug).exclude(pk=self.pk).exists():
                 n += 1
                 slug = f"{base}-{n}"
@@ -147,9 +134,6 @@ class Post(models.Model):
         return self.title
 
 
-# ---------------------------------------------------------------------------
-# Comments
-# ---------------------------------------------------------------------------
 class Comment(models.Model):
     """
     One level of replies (parent can itself be a top-level comment).
@@ -159,12 +143,12 @@ class Comment(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     post = models.ForeignKey(
         Post,
-        on_delete=models.CASCADE,           # deleting a post removes its comments
+        on_delete=models.CASCADE,           
         related_name="comments",
     )
     author = models.ForeignKey(
         settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,           # comments may vanish with the user
+        on_delete=models.CASCADE,           
         related_name="comments",
     )
     # parent = models.ForeignKey(

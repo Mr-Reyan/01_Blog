@@ -17,6 +17,8 @@ class CommentListCreateView(GenericAPIView):
     permission_classes = [IsAuthenticatedOrReadOnly]   
 
     def get_queryset(self):
+        if getattr(self, "swagger_fake_view", False):
+            return Comment.objects.none()
         post = _get_visible_post(self.request, self.kwargs["post_slug"])
         return (
             Comment.objects
@@ -53,5 +55,7 @@ class CommentDetailView(DestroyAPIView):
     permission_classes = [IsAuthenticated, IsOwnerOrAdmin]
 
     def get_queryset(self):
+        if getattr(self, "swagger_fake_view", False):
+            return Comment.objects.none()
         post = _get_visible_post(self.request, self.kwargs["post_slug"])
         return Comment.objects.filter(post=post)

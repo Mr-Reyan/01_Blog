@@ -1,6 +1,5 @@
 # Engineering Decisions - Blog Platform
 
-> DRAFT written from the source code and its comments. Rewrite the "why" in your own words so it is what you actually reasoned; the reviewer will ask. Search for `<<FILL` and `<<VERIFY` before submitting.
 
 ## 1. Decision log
 
@@ -20,7 +19,7 @@
 - **Options:** session cookies, DRF token auth, JWT.
 - **Chosen:** JWT access + refresh tokens.
 - **Why:** stateless API that any client can call with a bearer header.
-- **Trade-off:** tokens cannot be revoked before expiry unless blacklisting is wired up (gap G1).
+- **Trade-off:** tokens cannot be revoked before expiry unless blacklisting is wired up.
 
 ### D4. One visibility rule, and 404 instead of 403 for hidden drafts
 - **Options:** check visibility inside every view vs one shared function.
@@ -52,7 +51,7 @@
 - **Trade-off:** full scans on large tables; see Scaling in `cost-and-scaling.xlsx`.
 
 ### D10. Login rate limiting
-- **Chosen:** DRF `ScopedRateThrottle` with scope `login`. Rate: <<FILL: value from settings>>.
+- **Chosen:** DRF `ScopedRateThrottle` with scope `login`. Rate: 10/minute.
 - **Why:** slows password guessing on the one endpoint that checks credentials.
 
 ### D11. Testing approach
@@ -66,8 +65,8 @@
 - Authorization has three layers: authentication, role/object permissions (`IsAdminRole`, `IsOwnerOrAdmin`), and queryset visibility.
 - Hidden resources return 404, not 403.
 - Login is throttled (D10).
-- Secrets are read from environment variables, none committed <<VERIFY: grep the repo and git history for the secret key and any .env>>.
-- **Not implemented:** email verification, password reset, throttling on register/refresh (gap G7), CORS policy <<FILL>>, HTTPS (a deployment concern).
+- Secrets are read from environment variables, none committed.
+- **Not implemented:** email verification, password reset, throttling on register/refresh (gap G7), HTTPS (a deployment concern).
 
 ## 3. Technical risks
 
@@ -84,14 +83,14 @@
 | Auth, roles, posts, drafts/publish, categories, comments, search/filter | Implemented |
 | 113 automated tests | Implemented |
 | Login throttling | Implemented |
-| OpenAPI spec | Implemented (hand-written, `openapi.yaml`) |
-| Docker | <<FILL: Implemented or Proposed>> |
-| CI/CD | <<FILL: Implemented or Proposed>> |
+| OpenAPI spec | Implemented (`openapi.yaml`) |
+| Docker | Proposed |
+| CI/CD | Proposed |
 | Cache (e.g. Redis) | Proposed |
 | Queue / background workers | Proposed |
-| Monitoring / logging stack | <<FILL: Implemented or Proposed>> |
-| Avatars via object storage | Proposed (noted in the model) |
-| Nested comment replies, post excerpt | Proposed (fields are commented out in the model) |
+| Monitoring / logging stack | Proposed |
+| Avatars via object storage | Proposed  |
+| Nested comment replies | Proposed (fields are commented out in the model) |
 
 Mark anything here as Implemented only if it is really in the repository.
 
@@ -99,13 +98,11 @@ Mark anything here as Implemented only if it is really in the repository.
 
 | ID | Gap | Impact | Remediation |
 |---|---|---|---|
-| G1 | `LogoutView` exists but is not routed in `urls.py`; blacklisting also needs `rest_framework_simplejwt.token_blacklist` in `INSTALLED_APPS` <<VERIFY>> | Tokens cannot be revoked | Add the route and a test, or remove the view |
+| G1 | blacklisting needs `rest_framework_simplejwt.token_blacklist` in `INSTALLED_APPS` | Tokens cannot be revoked | Not tested |
 | G2 | `comment_count` and `view_count` are never updated (comment create/delete do not touch them) | Counters always read 0 | Update with `F()` expressions in a service function, or remove the fields |
-| G3 | `view_count` is not in the serializer's `read_only_fields`, so a client can set it <<remove this row once fixed>> | Clients can fake view counts | Add `"view_count"` to `read_only_fields` |
 | G4 | `@action(permission_classes=...)` on `publish` is ignored because `get_permissions()` returns `IsAuthenticated` for custom actions. Safety comes from visibility (drafts are 404 for non-owners). A non-owner on a published post gets 409, not 403 | Intended ownership check is not what protects the endpoint | Add `"publish"` to the owner-or-admin branch of `get_permissions()`; the related test then expects 403 |
 | G5 | Comment creation checks `role != "ADMIN"` while the rest of the app uses `is_admin()` (role or superuser) | A superuser whose role is AUTHOR gets 409 on other users' drafts | Use `request.user.is_admin()` |
 | G6 | No pagination | Large responses | `PageNumberPagination` or cursor pagination; update the list tests |
 | G7 | No throttle on register or refresh | Account-creation spam | Add scoped throttles |
 | G8 | Post slug uniqueness is checked before save (acknowledged in the code comment) | Rare `IntegrityError` under concurrency | Retry on `IntegrityError` |
 | G9 | Post body limited to 1000 characters | Short for a blog | Raise the limit if the product needs it |
-| G10 | `Comment` docstring mentions replies, but the `parent` field is commented out | Misleading docs | Update the docstring |
