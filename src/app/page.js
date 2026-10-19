@@ -1,69 +1,200 @@
-import Image from "next/image";
+'use client';
+
+import { useQuery } from '@tanstack/react-query';
+import api from '@/lib/api';
+import Link from 'next/link';
+
+const formatDate = (value) =>
+  value
+    ? new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    : '';
+
+const readingTime = (body = '') => Math.max(1, Math.round(body.trim().split(/\s+/).length / 200));
+
+const excerpt = (body = '', n) => body.slice(0, n) + (body.length > n ? '…' : '');
+
+function Meta({ post }) {
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-zinc-500">
+      {post.author && (
+        <span className="flex items-center gap-2">
+          <span
+            className="flex h-6 w-6 items-center justify-center rounded-full bg-zinc-900 text-[11px] font-semibold text-white"
+            aria-hidden="true"
+          >
+            {post.author.username?.charAt(0).toUpperCase()}
+          </span>
+          <span className="font-medium text-zinc-800">{post.author.username}</span>
+        </span>
+      )}
+      {post.published_at && <span>{formatDate(post.published_at)}</span>}
+      <span>{readingTime(post.body)} min read</span>
+    </div>
+  );
+}
+
+function Categories({ categories }) {
+  if (!categories || categories.length === 0) return null;
+  return (
+    <div className="flex flex-wrap gap-2">
+      {categories.slice(0, 2).map((c) => (
+        <span key={c.id} className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-800">
+          {c.name}
+        </span>
+      ))}
+    </div>
+  );
+}
 
 export default function Home() {
+  const { data: posts, isLoading, error } = useQuery({
+    queryKey: ['posts'],
+    queryFn: async () => {
+      const response = await api.get('/posts/');
+      return response.data;
+    },
+  });
+
+  const sorted = posts
+    ? [...posts].sort((a, b) => new Date(b.published_at) - new Date(a.published_at)).slice(0, 5)
+    : [];
+  const [featured, ...rest] = sorted;
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.js
-            </code>{" "}
-            file.
+    <div className="min-h-screen bg-white text-zinc-900">
+      {/* Hero */}
+      <section className="border-b border-zinc-200">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-24">
+          <h1 className="font-serif text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight leading-[1.1] max-w-3xl">
+            Stories and ideas worth a slow read.
           </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+          <p className="mt-6 max-w-xl text-lg leading-relaxed text-zinc-600">
+            Writers share what they know on any topic. Read something new today, or publish your own.
           </p>
+          <div className="mt-8 flex flex-wrap gap-3">
+            <Link
+              href="/posts"
+              className="rounded-full bg-zinc-900 px-6 py-3 text-sm font-semibold text-white hover:bg-zinc-700 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-zinc-900"
+            >
+              Browse all posts
+            </Link>
+            <Link
+              href="/create"
+              className="rounded-full border border-zinc-300 px-6 py-3 text-sm font-semibold text-zinc-800 hover:border-zinc-900 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-zinc-900"
+            >
+              Write a post
+            </Link>
+          </div>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+      </section>
+
+      {/* Latest posts */}
+      <section className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16">
+        <div className="mb-8 flex items-baseline justify-between border-b border-zinc-200 pb-4">
+          <h2 className="font-serif text-2xl sm:text-3xl font-bold">Latest posts</h2>
+          {!isLoading && !error && posts && posts.length > 0 && (
+            <Link
+              href="/posts"
+              className="text-sm font-semibold text-emerald-700 hover:text-emerald-900 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700"
+            >
+              View all posts
+            </Link>
+          )}
         </div>
-      </main>
+
+        {isLoading && (
+          <div className="grid gap-10 lg:grid-cols-12 animate-pulse" aria-busy="true">
+            <div className="lg:col-span-7 space-y-4">
+              <div className="h-4 w-24 rounded bg-zinc-100" />
+              <div className="h-10 w-5/6 rounded bg-zinc-100" />
+              <div className="h-4 rounded bg-zinc-100" />
+              <div className="h-4 w-2/3 rounded bg-zinc-100" />
+            </div>
+            <div className="lg:col-span-5 space-y-8">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="space-y-3">
+                  <div className="h-6 w-4/5 rounded bg-zinc-100" />
+                  <div className="h-4 w-1/2 rounded bg-zinc-100" />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {error && (
+          <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-6">
+            <p className="font-semibold text-red-800">We couldn’t load the posts.</p>
+            <p className="mt-1 text-sm text-red-700">Check your connection and refresh the page.</p>
+          </div>
+        )}
+
+        {!isLoading && !error && posts && posts.length === 0 && (
+          <div className="py-16 text-center">
+            <p className="font-serif text-2xl font-bold">No posts yet</p>
+            <p className="mt-2 text-zinc-600">Be the first to publish a story.</p>
+            <Link
+              href="/create"
+              className="mt-6 inline-block rounded-full bg-emerald-700 px-6 py-3 text-sm font-semibold text-white hover:bg-emerald-800 transition-colors"
+            >
+              Write a post
+            </Link>
+          </div>
+        )}
+
+        {!isLoading && !error && featured && (
+          <div className="grid gap-12 lg:grid-cols-12">
+            {/* Featured */}
+            <article className="lg:col-span-7 lg:pr-8 lg:border-r lg:border-zinc-200">
+              <Categories categories={featured.categories} />
+              <h3 className="mt-4 font-serif text-3xl sm:text-4xl font-bold leading-tight tracking-tight">
+                <Link
+                  href={`/posts/${featured.slug}`}
+                  className="hover:text-emerald-800 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700 rounded"
+                >
+                  {featured.title}
+                </Link>
+              </h3>
+              <p className="mt-4 font-serif text-lg leading-8 text-zinc-700 max-w-prose">
+                {excerpt(featured.body, 260)}
+              </p>
+              <div className="mt-6">
+                <Meta post={featured} />
+              </div>
+              <Link
+                href={`/posts/${featured.slug}`}
+                className="mt-6 inline-block text-sm font-semibold text-emerald-700 hover:text-emerald-900 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700"
+              >
+                Read the full post
+              </Link>
+            </article>
+
+            {/* Rest */}
+            {rest.length > 0 && (
+              <div className="lg:col-span-5 divide-y divide-zinc-200">
+                {rest.map((post, i) => (
+                  <article key={post.id} className={i === 0 ? 'pb-6' : 'py-6'}>
+                    <Categories categories={post.categories} />
+                    <h3 className="mt-3 font-serif text-xl font-bold leading-snug">
+                      <Link
+                        href={`/posts/${post.slug}`}
+                        className="hover:text-emerald-800 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700 rounded"
+                      >
+                        {post.title}
+                      </Link>
+                    </h3>
+                    <p className="mt-2 text-sm leading-relaxed text-zinc-600 line-clamp-2">
+                      {excerpt(post.body, 120)}
+                    </p>
+                    <div className="mt-3">
+                      <Meta post={post} />
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </section>
     </div>
   );
 }

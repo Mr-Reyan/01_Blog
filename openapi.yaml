@@ -1,0 +1,875 @@
+openapi: 3.0.3
+info:
+  title: Blog Platform API
+  version: "1.0.0"
+  description: >
+    REST API for the Blog Platform MVP (Django 5.2 + Django REST Framework).
+    Authentication uses JWT bearer tokens (SimpleJWT). Roles: AUTHOR and ADMIN.
+    Post visibility: anonymous callers see only PUBLISHED posts; authenticated callers see
+    published posts plus their own; ADMIN sees everything. A post the caller may not see
+    returns 404 (not 403) so drafts are never revealed. List endpoints are not paginated.
+    Error bodies are either field errors ({"field": ["message"]}) or {"detail": "message"}.
+servers:
+  - url: http://localhost:8000/api/v1
+    description: Local development
+tags:
+  - name: Auth
+  - name: Categories
+  - name: Posts
+  - name: Comments
+
+paths:
+  /auth/register/:
+    post:
+      tags: [Auth]
+      summary: Register a new AUTHOR account
+      description: >
+        Public. Always creates role AUTHOR; any "role" sent by the client is ignored.
+        Username uniqueness is case-insensitive.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+            example:
+              username: "newbie"
+              password: "s3curePass!"
+      responses:
+        "201":
+          description: Account created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+
+  /auth/login/:
+    post:
+      tags: [Auth]
+      summary: Obtain access and refresh tokens
+      description: Public. Rate limited (throttle scope "login"). Inactive users cannot log in.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+            example:
+              username: "alice"
+              password: "s3curePass!"
+      responses:
+        "200":
+          description: Token pair issued.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TokenPair"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          description: Wrong credentials or inactive account.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Detail"
+        "429":
+          $ref: "#/components/responses/Throttled"
+
+  /auth/refresh/:
+    post:
+      tags: [Auth]
+      summary: Exchange a refresh token for a new access token
+      description: Public (no access token required).
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefreshRequest"
+      responses:
+        "200":
+          description: New access token.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccessToken"
+        "401":
+          description: Invalid or expired refresh token.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Detail"
+
+  /auth/me/:
+    get:
+      tags: [Auth]
+      summary: Current user profile
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: The authenticated user.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /categories/:
+    get:
+      tags: [Categories]
+      summary: List categories
+      description: Public. Flat list ordered by name (no pagination).
+      security: []
+      responses:
+        "200":
+          description: All categories.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Category"
+    post:
+      tags: [Categories]
+      summary: Create a category (ADMIN only)
+      description: The slug is generated from the name and cannot be set by the client.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CategoryInput"
+            example:
+              name: "Machine Learning"
+              description: "Posts about ML"
+      responses:
+        "201":
+          description: Category created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Category"
+        "400":
+          description: >
+            Missing or blank name, or the name (or its slug) collides with an existing category.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationErrors"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /categories/{slug}/:
+    parameters:
+      - $ref: "#/components/parameters/CategorySlug"
+    get:
+      tags: [Categories]
+      summary: Retrieve a category
+      security: []
+      responses:
+        "200":
+          description: The category.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Category"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      tags: [Categories]
+      summary: Replace a category (ADMIN only)
+      description: The slug stays unchanged even if the name changes (URL stability).
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CategoryInput"
+      responses:
+        "200":
+          description: Updated category.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Category"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      tags: [Categories]
+      summary: Partially update a category (ADMIN only)
+      description: The slug is read-only and ignored if sent. Renaming does not change the slug.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CategoryPatch"
+            example:
+              description: "Python language"
+      responses:
+        "200":
+          description: Updated category.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Category"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [Categories]
+      summary: Delete a category (ADMIN only)
+      description: Posts are kept; they are only detached from the category.
+      security:
+        - bearerAuth: []
+      responses:
+        "204":
+          description: Deleted.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /posts/:
+    get:
+      tags: [Posts]
+      summary: List visible posts
+      description: >
+        Public. Anonymous callers get PUBLISHED posts only. Authenticated callers also get their
+        own drafts; ADMIN gets all posts. Default ordering is newest published first.
+        The response is a plain array (no pagination).
+      security: []
+      parameters:
+        - name: search
+          in: query
+          description: Case-insensitive match against title and body.
+          schema:
+            type: string
+        - name: category
+          in: query
+          description: Category slug. An unknown slug returns an empty list.
+          schema:
+            type: string
+        - name: mine
+          in: query
+          description: >
+            When "true", return only the caller's own posts (all statuses). Anonymous callers get an
+            empty list. Other filters such as an author parameter are ignored.
+          schema:
+            type: string
+            enum: ["true"]
+        - name: ordering
+          in: query
+          description: >
+            Sort field, prefix with "-" for descending. Allowed fields: published_at, created_at, title.
+            Default is "-published_at".
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Matching posts.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Post"
+    post:
+      tags: [Posts]
+      summary: Create a post (always as DRAFT)
+      description: >
+        The author is the caller. Client-supplied author, slug, status and published_at are ignored.
+        Use POST /posts/{slug}/publish/ to publish.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PostInput"
+            example:
+              title: "Hello"
+              body: "A body of at least ten characters."
+              categories: []
+      responses:
+        "201":
+          description: Draft created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Post"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /posts/{slug}/:
+    parameters:
+      - $ref: "#/components/parameters/PostSlug"
+    get:
+      tags: [Posts]
+      summary: Retrieve a post
+      description: Drafts are visible only to their author and ADMIN; everyone else gets 404.
+      security: []
+      responses:
+        "200":
+          description: The post.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Post"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      tags: [Posts]
+      summary: Replace a post (owner or ADMIN)
+      description: Status and slug cannot be changed here.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PostInput"
+      responses:
+        "200":
+          description: Updated post.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Post"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: Post is visible to the caller (published) but the caller is not the owner or ADMIN.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Detail"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      tags: [Posts]
+      summary: Partially update a post (owner or ADMIN)
+      description: >
+        A "status" or "slug" in the payload is ignored (publishing goes through /publish/).
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PostPatch"
+            example:
+              title: "Updated"
+      responses:
+        "200":
+          description: Updated post.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Post"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: Post is visible to the caller (published) but the caller is not the owner or ADMIN.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Detail"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [Posts]
+      summary: Delete a post (owner or ADMIN)
+      description: Also deletes the post's comments.
+      security:
+        - bearerAuth: []
+      responses:
+        "204":
+          description: Deleted.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: Post is visible to the caller (published) but the caller is not the owner or ADMIN.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Detail"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /posts/{slug}/publish/:
+    parameters:
+      - $ref: "#/components/parameters/PostSlug"
+    post:
+      tags: [Posts]
+      summary: Publish a draft
+      description: >
+        Sets status to PUBLISHED and published_at to the current time. Takes no request body.
+        A non-owner cannot see someone else's draft (404). A non-owner who calls this on an
+        already published post receives 409, because the object-level ownership check is not
+        applied to this action (see engineering-decisions.md, gap G4).
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Post published.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublishResult"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: Post is already published.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Detail"
+              example:
+                detail: "Post is already published."
+
+  /posts/{post_slug}/comments/:
+    parameters:
+      - $ref: "#/components/parameters/PostSlugForComments"
+    get:
+      tags: [Comments]
+      summary: List visible comments on a post
+      description: >
+        Public for published posts. Comments hidden by an admin (is_visible=false) are omitted.
+        Ordered oldest first. A post the caller cannot see returns 404.
+      security: []
+      responses:
+        "200":
+          description: Comments.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Comment"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    post:
+      tags: [Comments]
+      summary: Add a comment
+      description: >
+        Author is the caller; client-supplied author, post and is_visible are ignored.
+        The post comes from the URL. A post the caller cannot see returns 404.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CommentInput"
+            example:
+              body: "nice post"
+      responses:
+        "201":
+          description: Comment created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Comment"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: >
+            Comments are disabled on an unpublished post for a caller who is neither its author nor
+            a user with role ADMIN. Normally unreachable because such callers get 404 first; it can
+            occur for a superuser whose role field is not ADMIN (see engineering-decisions.md, gap G5).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Detail"
+
+  /posts/{post_slug}/comments/{id}/:
+    parameters:
+      - $ref: "#/components/parameters/PostSlugForComments"
+      - $ref: "#/components/parameters/CommentId"
+    delete:
+      tags: [Comments]
+      summary: Delete a comment (comment author or ADMIN)
+      description: >
+        The comment must belong to the post in the URL, otherwise 404.
+      security:
+        - bearerAuth: []
+      responses:
+        "204":
+          description: Deleted.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: Caller is neither the comment author nor ADMIN.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Detail"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: "Send the access token as: Authorization: Bearer <access>"
+
+  parameters:
+    PostSlug:
+      name: slug
+      in: path
+      required: true
+      description: Post slug (generated from the title).
+      schema:
+        type: string
+    PostSlugForComments:
+      name: post_slug
+      in: path
+      required: true
+      description: Slug of the parent post.
+      schema:
+        type: string
+    CategorySlug:
+      name: slug
+      in: path
+      required: true
+      description: Category slug (generated from the name).
+      schema:
+        type: string
+    CommentId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+  responses:
+    ValidationError:
+      description: Validation failed. Keys are field names.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ValidationErrors"
+          example:
+            body: ["Ensure this field has at least 10 characters."]
+    Unauthorized:
+      description: Missing, invalid or expired access token.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Detail"
+          example:
+            detail: "Authentication credentials were not provided."
+    Forbidden:
+      description: Authenticated but not allowed (for example, an AUTHOR calling an ADMIN-only endpoint).
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Detail"
+          example:
+            detail: "You do not have permission to perform this action."
+    NotFound:
+      description: Not found, or not visible to the caller.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Detail"
+          example:
+            detail: "Not found."
+    Throttled:
+      description: Too many requests.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Detail"
+
+  schemas:
+    Detail:
+      type: object
+      properties:
+        detail:
+          type: string
+    ValidationErrors:
+      type: object
+      description: Map of field name to a list of messages.
+      additionalProperties:
+        type: array
+        items:
+          type: string
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        username:
+          type: string
+          readOnly: true
+        role:
+          type: string
+          enum: [AUTHOR, ADMIN]
+          readOnly: true
+        bio:
+          type: string
+          readOnly: true
+        date_joined:
+          type: string
+          format: date-time
+          readOnly: true
+    RegisterRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+          maxLength: 150
+          description: Letters, digits and @/./+/-/_ only. Unique ignoring case.
+        password:
+          type: string
+          minLength: 8
+          writeOnly: true
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+          writeOnly: true
+    TokenPair:
+      type: object
+      properties:
+        access:
+          type: string
+        refresh:
+          type: string
+    RefreshRequest:
+      type: object
+      required: [refresh]
+      properties:
+        refresh:
+          type: string
+    AccessToken:
+      type: object
+      properties:
+        access:
+          type: string
+    Category:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        name:
+          type: string
+          maxLength: 80
+        slug:
+          type: string
+          readOnly: true
+        description:
+          type: string
+          maxLength: 255
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+    CategoryInput:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          maxLength: 80
+        description:
+          type: string
+          maxLength: 255
+    CategoryPatch:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 80
+        description:
+          type: string
+          maxLength: 255
+    Post:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        title:
+          type: string
+          minLength: 3
+          maxLength: 200
+        slug:
+          type: string
+          readOnly: true
+        body:
+          type: string
+          minLength: 10
+          maxLength: 1000
+        author:
+          $ref: "#/components/schemas/User"
+        categories:
+          type: array
+          description: Full category objects in responses; send category ids in requests.
+          items:
+            $ref: "#/components/schemas/Category"
+        status:
+          type: string
+          enum: [DRAFT, PUBLISHED]
+          readOnly: true
+        published_at:
+          type: string
+          format: date-time
+          nullable: true
+          readOnly: true
+        view_count:
+          type: integer
+          readOnly: true
+        comment_count:
+          type: integer
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+    PostInput:
+      type: object
+      required: [title, body]
+      properties:
+        title:
+          type: string
+          minLength: 3
+          maxLength: 200
+        body:
+          type: string
+          minLength: 10
+          maxLength: 1000
+        categories:
+          type: array
+          items:
+            type: string
+            format: uuid
+    PostPatch:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 3
+          maxLength: 200
+        body:
+          type: string
+          minLength: 10
+          maxLength: 1000
+        categories:
+          type: array
+          items:
+            type: string
+            format: uuid
+    PublishResult:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        slug:
+          type: string
+        status:
+          type: string
+          enum: [PUBLISHED]
+        published_at:
+          type: string
+          format: date-time
+    Comment:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        body:
+          type: string
+          maxLength: 500
+        author:
+          type: string
+          format: uuid
+          readOnly: true
+        author_username:
+          type: string
+          readOnly: true
+        is_visible:
+          type: boolean
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+    CommentInput:
+      type: object
+      required: [body]
+      properties:
+        body:
+          type: string
+          minLength: 1
+          maxLength: 500
